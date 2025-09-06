@@ -27,6 +27,9 @@ Thumbs.db
 # Database and incremental compilation
 db/
 incremental_db/
+fgpa/work/
+fgpa/*.mpf
+fgpa/*.ini
 
 # Output and synthesis files
 output_files/
