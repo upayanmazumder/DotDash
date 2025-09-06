@@ -10,4 +10,5 @@ void loop()
 {
   // Runs repeatedly after setup()
   Serial.println("Hello from ESP32");
-  delay(1000); // wa
+  delay(1000); // Wait for 1 second
+}
