@@ -11,7 +11,7 @@ The project demonstrates a modern implementation of **Morse code transmission an
 
 ## 📂 Project Structure  
 
-```graphql
+```text
 dotdash/
 ├── esp32/                     # ESP32 (Arduino IDE) firmware
 │   ├── src/                   # Main code (.ino, .cpp, .h)
