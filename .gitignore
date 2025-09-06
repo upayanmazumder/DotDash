@@ -1,0 +1,74 @@
+# ---- General ----
+*.log
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+Thumbs.db
+
+# ---- Arduino / ESP32 ----
+*.bin
+*.elf
+*.hex
+*.eep
+*.map
+*.dmp
+*.a
+*.o
+*.out
+*.class
+
+# VSCode / Arduino IDE cache
+.vscode/
+.idea/
+*.pro.user
+
+# ---- Quartus / FPGA ----
+# Database and incremental compilation
+db/
+incremental_db/
+
+# Output and synthesis files
+output_files/
+*.sof
+*.pof
+*.jic
+*.sopcinfo
+*.sta.rpt
+*.fit.rpt
+*.asm.rpt
+*.drc.rpt
+*.eqn
+*.pin
+*.summary
+
+# Simulation
+simulation/
+*.vcd
+*.wlf
+*.sdo
+
+# Temporary / Cache
+*.bak
+*.rpt
+*.qws
+*.qdf
+*.qdz
+*.qip
+*.ip
+*.svd
+*.ddb
+*.ppf
+*.cdf
+*.cmp
+*.fsf
+*.jdi
+
+# Vivado-style leftovers (if ever shared)
+*.jou
+*.str
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
