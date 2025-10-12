@@ -40,7 +40,7 @@ String liveMorse = "";
 void setup() {
   Serial.begin(115200);
 
-  // OLED
+  // OLED init
   Wire.begin(SDA_PIN, SCL_PIN);
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x12_tf);
@@ -60,27 +60,26 @@ void setup() {
   IPAddress apIP = WiFi.softAPIP();
   Serial.print("AP IP: "); Serial.println(apIP);
 
-  // Start DNS server
+  // Start DNS server (catch-all)
   dnsServer.start(53, "*", apIP);
 
-  // Web server root
+  // Web server routes
   webServer.on("/", handleRoot);
-  
-  // SSE endpoint for live Morse updates
   webServer.on("/live", handleLive);
-  
-  // Send message manually
   webServer.on("/send", [](){
     String msg = webServer.arg("m");
     decodedMessage += msg;
     webServer.send(200, "text/plain", "OK");
   });
-
-  // Redirect all unknown requests to root
   webServer.onNotFound(handleRoot);
-
   webServer.begin();
-  Serial.println("Captive portal ready!");
+
+  // Passive buzzer startup beep sequence
+  tone(BUZZER_PIN, 1000, 200); delay(250);
+  tone(BUZZER_PIN, 1200, 200); delay(250);
+  tone(BUZZER_PIN, 1500, 300); delay(350);
+
+  Serial.println("DotDash ready!");
 }
 
 // -------------------- Web handlers --------------------
@@ -102,8 +101,7 @@ void handleRoot() {
                 "};"
                 "function sendMsg(){"
                 "fetch('/send?m='+encodeURIComponent(document.getElementById('msg').value));"
-                "document.getElementById('msg').value='';"
-                "}"
+                "document.getElementById('msg').value='';}"
                 "</script></body></html>";
   webServer.send(200, "text/html", html);
 }
@@ -112,7 +110,6 @@ void handleLive() {
   webServer.sendHeader("Content-Type", "text/event-stream");
   webServer.sendHeader("Cache-Control", "no-cache");
   webServer.sendHeader("Connection", "keep-alive");
-  
   String data = "{\"morse\":\"" + liveMorse + "\",\"decoded\":\"" + decodedMessage + "\"}";
   webServer.send(200, "text/event-stream", "data: " + data + "\n\n");
 }
@@ -123,7 +120,29 @@ char decodeMorseToken(String token){
   return '?';
 }
 
-// -------------------- Touch input --------------------
+// -------------------- Word-wrap helper --------------------
+void drawWrappedText(String text, int x, int y, int maxWidth, int lineHeight){
+  int start = 0;
+  int len = text.length();
+  while(start < len){
+    int end = start;
+    String line = "";
+    while(end < len){
+      line += text[end];
+      if(u8g2.getStrWidth(line.c_str()) > maxWidth){
+        line.remove(line.length()-1);
+        break;
+      }
+      end++;
+    }
+    u8g2.setCursor(x, y);
+    u8g2.print(line);
+    y += lineHeight;
+    start = end;
+  }
+}
+
+// -------------------- Touch input & passive buzzer --------------------
 void checkTouch(){
   static bool pressed = false;
   static unsigned long pressStart = 0;
@@ -131,34 +150,33 @@ void checkTouch(){
   int state = digitalRead(TOUCH_PIN);
   unsigned long now = millis();
 
-  // Touch pressed
+  // Start tone while pressed
   if(state && !pressed){
     pressed = true;
     pressStart = now;
-    tone(BUZZER_PIN, 1000);
+    tone(BUZZER_PIN, 1000); // passive buzzer ON
   }
 
-  // Touch released
+  // Stop tone on release
   if(!state && pressed){
     pressed = false;
-    noTone(BUZZER_PIN);
+    noTone(BUZZER_PIN);       // passive buzzer OFF
     unsigned long duration = now - pressStart;
     String symbol = (duration < 200) ? "." : "-";
     currentToken += symbol;
-    liveMorse += symbol;
+    liveMorse = currentToken;  // live browser preview
     lastInputTime = now;
   }
 
-  // Letter end
+  // Detect end of letter
   if(!pressed && currentToken.length() && (now - lastInputTime > 600)){
-    char decodedChar = decodeMorseToken(currentToken);
-    decodedMessage += decodedChar;
+    decodedMessage += decodeMorseToken(currentToken);
     currentToken = "";
     liveMorse = "";
     lastInputTime = now;
   }
 
-  // Word end
+  // Detect end of word
   if(!pressed && (now - lastInputTime > 1400) && decodedMessage.length() && decodedMessage.charAt(decodedMessage.length()-1) != ' '){
     decodedMessage += " ";
   }
@@ -167,10 +185,11 @@ void checkTouch(){
 // -------------------- OLED --------------------
 void updateOLED(){
   u8g2.clearBuffer();
-  u8g2.setCursor(0,12);
-  u8g2.print("Decoded:");
-  u8g2.setCursor(0,26);
-  u8g2.print(decodedMessage);
+  u8g2.setCursor(0,0);
+  u8g2.print("Morse: "); 
+  u8g2.print(currentToken);       // Live token
+
+  drawWrappedText("Decoded: " + decodedMessage, 0, 20, u8g2.getDisplayWidth(), 12);
   u8g2.sendBuffer();
 }
 
