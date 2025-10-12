@@ -1,12 +1,12 @@
-#include <Wire.h>
-#include <U8g2lib.h>
 #include <WiFi.h>
 #include <DNSServer.h>
 #include <WebServer.h>
+#include <Wire.h>
+#include <U8g2lib.h>
 
 // -------------------- PINS --------------------
-#define TOUCH_PIN 4         // HW-494 touch DO
-#define BUZZER_PIN 15       // Buzzer +
+#define TOUCH_PIN 4
+#define BUZZER_PIN 15
 #define SDA_PIN 21
 #define SCL_PIN 22
 
@@ -16,7 +16,6 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, SCL_PIN, SDA_PI
 // -------------------- WiFi AP / Captive portal --------------------
 const char* AP_SSID = "DotDash";
 const char* AP_PASS = "";
-IPAddress apIP(192,168,4,1);
 DNSServer dnsServer;
 WebServer webServer(80);
 
@@ -32,103 +31,140 @@ std::map<char, String> CHAR_TO_MORSE = {
   {'6', "-...."}, {'7', "--..."}, {'8', "---.."}, {'9', "----."}, {'0', "-----"},
   {' ', "/"}
 };
-
-std::map<String, char> MORSE_TO_CHAR; // reversed map
+std::map<String, char> MORSE_TO_CHAR;
 String currentToken = "";
 String decodedMessage = "";
+String liveMorse = "";
 
 // -------------------- Setup --------------------
 void setup() {
   Serial.begin(115200);
 
-  // I2C init
+  // OLED
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setClock(100000);
   u8g2.begin();
-  u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_6x12_tf);
+  u8g2.clearBuffer();
   u8g2.setCursor(0,12);
   u8g2.print("Starting DotDash...");
   u8g2.sendBuffer();
 
-  // Pins
   pinMode(TOUCH_PIN, INPUT_PULLDOWN);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // Build MORSE_TO_CHAR
-  for(auto &pair : CHAR_TO_MORSE) MORSE_TO_CHAR[pair.second] = pair.first;
+  // Morse reverse map
+  for(auto &p : CHAR_TO_MORSE) MORSE_TO_CHAR[p.second] = p.first;
 
-  // WiFi AP + DNS
-  WiFi.mode(WIFI_AP);
+  // Start WiFi AP
   WiFi.softAP(AP_SSID, AP_PASS);
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255,255,255,0));
+  IPAddress apIP = WiFi.softAPIP();
+  Serial.print("AP IP: "); Serial.println(apIP);
+
+  // Start DNS server
   dnsServer.start(53, "*", apIP);
 
-  // Web server routes
-  webServer.on("/", [](){
-    webServer.send(200, "text/html",
-      "<h1>DotDash</h1>"
-      "<p>Type Morse code below:</p>"
-      "<input id='msg' placeholder='Message'>"
-      "<button onclick='sendMsg()'>Send</button>"
-      "<script>"
-      "function sendMsg(){"
-      "let m = document.getElementById('msg').value;"
-      "fetch('/send?m='+encodeURIComponent(m));"
-      "}"
-      "</script>");
-  });
-
+  // Web server root
+  webServer.on("/", handleRoot);
+  
+  // SSE endpoint for live Morse updates
+  webServer.on("/live", handleLive);
+  
+  // Send message manually
   webServer.on("/send", [](){
     String msg = webServer.arg("m");
     decodedMessage += msg;
     webServer.send(200, "text/plain", "OK");
   });
 
-  Serial.println("DotDash ready!");
+  // Redirect all unknown requests to root
+  webServer.onNotFound(handleRoot);
+
+  webServer.begin();
+  Serial.println("Captive portal ready!");
+}
+
+// -------------------- Web handlers --------------------
+void handleRoot() {
+  String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width'>"
+                "<title>DotDash Portal</title></head><body>"
+                "<h1>DotDash Portal</h1>"
+                "<p>Live Morse input:</p>"
+                "<div id='morse'> </div>"
+                "<p>Decoded text:</p>"
+                "<div id='decoded'> </div>"
+                "<input id='msg' placeholder='Type message'><button onclick='sendMsg()'>Send</button>"
+                "<script>"
+                "var evtSource = new EventSource('/live');"
+                "evtSource.onmessage = function(e){"
+                "let data = JSON.parse(e.data);"
+                "document.getElementById('morse').innerText = data.morse;"
+                "document.getElementById('decoded').innerText = data.decoded;"
+                "};"
+                "function sendMsg(){"
+                "fetch('/send?m='+encodeURIComponent(document.getElementById('msg').value));"
+                "document.getElementById('msg').value='';"
+                "}"
+                "</script></body></html>";
+  webServer.send(200, "text/html", html);
+}
+
+void handleLive() {
+  webServer.sendHeader("Content-Type", "text/event-stream");
+  webServer.sendHeader("Cache-Control", "no-cache");
+  webServer.sendHeader("Connection", "keep-alive");
+  
+  String data = "{\"morse\":\"" + liveMorse + "\",\"decoded\":\"" + decodedMessage + "\"}";
+  webServer.send(200, "text/event-stream", "data: " + data + "\n\n");
 }
 
 // -------------------- Morse helpers --------------------
-String encodeToMorse(String msg){
-  msg.toUpperCase();
-  String morse = "";
-  for(int i=0; i<msg.length(); i++){
-    char c = msg[i];
-    if(CHAR_TO_MORSE.count(c)) morse += CHAR_TO_MORSE[c] + " ";
-  }
-  return morse;
-}
-
 char decodeMorseToken(String token){
   if(MORSE_TO_CHAR.count(token)) return MORSE_TO_CHAR[token];
   return '?';
 }
 
-// -------------------- Touch / Buzzer --------------------
+// -------------------- Touch input --------------------
 void checkTouch(){
-  static unsigned long lastTime = 0;
   static bool pressed = false;
+  static unsigned long pressStart = 0;
+  static unsigned long lastInputTime = 0;
   int state = digitalRead(TOUCH_PIN);
   unsigned long now = millis();
 
-  if(state==HIGH && !pressed){
+  // Touch pressed
+  if(state && !pressed){
     pressed = true;
-    lastTime = now;
+    pressStart = now;
     tone(BUZZER_PIN, 1000);
-    currentToken += "."; // simple dot for now
-    Serial.println("DOT detected");
   }
 
-  if(state==LOW && pressed){
+  // Touch released
+  if(!state && pressed){
     pressed = false;
     noTone(BUZZER_PIN);
-    decodedMessage += decodeMorseToken(currentToken);
+    unsigned long duration = now - pressStart;
+    String symbol = (duration < 200) ? "." : "-";
+    currentToken += symbol;
+    liveMorse += symbol;
+    lastInputTime = now;
+  }
+
+  // Letter end
+  if(!pressed && currentToken.length() && (now - lastInputTime > 600)){
+    char decodedChar = decodeMorseToken(currentToken);
+    decodedMessage += decodedChar;
     currentToken = "";
-    lastTime = now;
+    liveMorse = "";
+    lastInputTime = now;
+  }
+
+  // Word end
+  if(!pressed && (now - lastInputTime > 1400) && decodedMessage.length() && decodedMessage.charAt(decodedMessage.length()-1) != ' '){
+    decodedMessage += " ";
   }
 }
 
-// -------------------- OLED display --------------------
+// -------------------- OLED --------------------
 void updateOLED(){
   u8g2.clearBuffer();
   u8g2.setCursor(0,12);
@@ -144,5 +180,4 @@ void loop(){
   webServer.handleClient();
   checkTouch();
   updateOLED();
-  delay(50);
 }
