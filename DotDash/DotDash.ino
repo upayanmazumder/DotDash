@@ -19,21 +19,8 @@ const char* AP_PASS = "";
 DNSServer dnsServer;
 WebServer webServer(80);
 
-// -------------------- Morse code --------------------
-#include <map>
-std::map<char, String> CHAR_TO_MORSE = {
-  {'A', ".-"}, {'B', "-..."}, {'C', "-.-."}, {'D', "-.."}, {'E', "."}, {'F', "..-."},
-  {'G', "--."}, {'H', "...."}, {'I', ".."}, {'J', ".---"}, {'K', "-.-"}, {'L', ".-.."},
-  {'M', "--"}, {'N', "-."}, {'O', "---"}, {'P', ".--."}, {'Q', "--.-"}, {'R', ".-."},
-  {'S', "..."}, {'T', "-"}, {'U', "..-"}, {'V', "...-"}, {'W', ".--"}, {'X', "-..-"},
-  {'Y', "-.--"}, {'Z', "--.."},
-  {'1', ".----"}, {'2', "..---"}, {'3', "...--"}, {'4', "....-"}, {'5', "....."},
-  {'6', "-...."}, {'7', "--..."}, {'8', "---.."}, {'9', "----."}, {'0', "-----"},
-  {' ', "/"}
-};
-std::map<String, char> MORSE_TO_CHAR;
+// -------------------- Morse --------------------
 String currentToken = "";
-String decodedMessage = "";
 String liveMorse = "";
 
 // -------------------- Setup --------------------
@@ -52,9 +39,6 @@ void setup() {
   pinMode(TOUCH_PIN, INPUT_PULLDOWN);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // Morse reverse map
-  for(auto &p : CHAR_TO_MORSE) MORSE_TO_CHAR[p.second] = p.first;
-
   // Start WiFi AP
   WiFi.softAP(AP_SSID, AP_PASS);
   IPAddress apIP = WiFi.softAPIP();
@@ -66,15 +50,10 @@ void setup() {
   // Web server routes
   webServer.on("/", handleRoot);
   webServer.on("/live", handleLive);
-  webServer.on("/send", [](){
-    String msg = webServer.arg("m");
-    decodedMessage += msg;
-    webServer.send(200, "text/plain", "OK");
-  });
   webServer.onNotFound(handleRoot);
   webServer.begin();
 
-  // Passive buzzer startup beep sequence
+  // Startup beep sequence
   tone(BUZZER_PIN, 1000, 200); delay(250);
   tone(BUZZER_PIN, 1200, 200); delay(250);
   tone(BUZZER_PIN, 1500, 300); delay(350);
@@ -89,19 +68,11 @@ void handleRoot() {
                 "<h1>DotDash Portal</h1>"
                 "<p>Live Morse input:</p>"
                 "<div id='morse'> </div>"
-                "<p>Decoded text:</p>"
-                "<div id='decoded'> </div>"
-                "<input id='msg' placeholder='Type message'><button onclick='sendMsg()'>Send</button>"
                 "<script>"
                 "var evtSource = new EventSource('/live');"
                 "evtSource.onmessage = function(e){"
-                "let data = JSON.parse(e.data);"
-                "document.getElementById('morse').innerText = data.morse;"
-                "document.getElementById('decoded').innerText = data.decoded;"
+                "document.getElementById('morse').innerText = e.data;"
                 "};"
-                "function sendMsg(){"
-                "fetch('/send?m='+encodeURIComponent(document.getElementById('msg').value));"
-                "document.getElementById('msg').value='';}"
                 "</script></body></html>";
   webServer.send(200, "text/html", html);
 }
@@ -110,14 +81,7 @@ void handleLive() {
   webServer.sendHeader("Content-Type", "text/event-stream");
   webServer.sendHeader("Cache-Control", "no-cache");
   webServer.sendHeader("Connection", "keep-alive");
-  String data = "{\"morse\":\"" + liveMorse + "\",\"decoded\":\"" + decodedMessage + "\"}";
-  webServer.send(200, "text/event-stream", "data: " + data + "\n\n");
-}
-
-// -------------------- Morse helpers --------------------
-char decodeMorseToken(String token){
-  if(MORSE_TO_CHAR.count(token)) return MORSE_TO_CHAR[token];
-  return '?';
+  webServer.send(200, "text/event-stream", liveMorse + "\n\n");
 }
 
 // -------------------- Word-wrap helper --------------------
@@ -142,54 +106,43 @@ void drawWrappedText(String text, int x, int y, int maxWidth, int lineHeight){
   }
 }
 
-// -------------------- Touch input & passive buzzer --------------------
-void checkTouch(){
+// -------------------- Touch & buzzer --------------------
+void checkTouch() {
   static bool pressed = false;
   static unsigned long pressStart = 0;
-  static unsigned long lastInputTime = 0;
+  static bool symbolAdded = false;  // ensure we only add once
   int state = digitalRead(TOUCH_PIN);
-  unsigned long now = millis();
 
-  // Start tone while pressed
-  if(state && !pressed){
+  if (state && !pressed) {
+    // just pressed
     pressed = true;
-    pressStart = now;
-    tone(BUZZER_PIN, 1000); // passive buzzer ON
+    pressStart = millis();
+    symbolAdded = false;
+    tone(BUZZER_PIN, 1000);  // start passive buzzer
   }
 
-  // Stop tone on release
-  if(!state && pressed){
-    pressed = false;
-    noTone(BUZZER_PIN);       // passive buzzer OFF
-    unsigned long duration = now - pressStart;
+  if (!state && pressed) {
+    // just released
+    unsigned long duration = millis() - pressStart;
+    noTone(BUZZER_PIN);       // stop buzzer
+
+    // determine symbol
     String symbol = (duration < 200) ? "." : "-";
     currentToken += symbol;
-    liveMorse = currentToken;  // live browser preview
-    lastInputTime = now;
-  }
+    liveMorse = currentToken; // update browser/OLED
 
-  // Detect end of letter
-  if(!pressed && currentToken.length() && (now - lastInputTime > 600)){
-    decodedMessage += decodeMorseToken(currentToken);
-    currentToken = "";
-    liveMorse = "";
-    lastInputTime = now;
-  }
-
-  // Detect end of word
-  if(!pressed && (now - lastInputTime > 1400) && decodedMessage.length() && decodedMessage.charAt(decodedMessage.length()-1) != ' '){
-    decodedMessage += " ";
+    pressed = false;
   }
 }
+
+
 
 // -------------------- OLED --------------------
 void updateOLED(){
   u8g2.clearBuffer();
   u8g2.setCursor(0,0);
   u8g2.print("Morse: "); 
-  u8g2.print(currentToken);       // Live token
-
-  drawWrappedText("Decoded: " + decodedMessage, 0, 20, u8g2.getDisplayWidth(), 12);
+  drawWrappedText(currentToken, 0, 12, u8g2.getDisplayWidth(), 12);
   u8g2.sendBuffer();
 }
 
