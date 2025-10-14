@@ -5,7 +5,7 @@
 #include <U8g2lib.h>
 
 // -------------------- PINS --------------------
-#define TOUCH_PIN 4
+#define TOUCH_PIN T0  // GPIO 4 = T0 touch pin on ESP32
 #define BUZZER_PIN 15
 #define SDA_PIN 21
 #define SCL_PIN 22
@@ -13,7 +13,7 @@
 // -------------------- OLED --------------------
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, SCL_PIN, SDA_PIN);
 
-// -------------------- WiFi AP / Captive portal --------------------
+// -------------------- WiFi AP --------------------
 const char* AP_SSID = "DotDash";
 const char* AP_PASS = "";
 DNSServer dnsServer;
@@ -23,56 +23,73 @@ WebServer webServer(80);
 String currentToken = "";
 String liveMorse = "";
 
+// -------------------- State --------------------
+bool isPressed = false;
+unsigned long pressStart = 0;
+unsigned long lastRead = 0;
+int baseLevel = 0;
+int touchThreshold = 0;
+
+// -------------------- Config --------------------
+const int DOT_TIME = 200;  // milliseconds
+const int DEBOUNCE = 30;   // ms
+const float THRESHOLD_FACTOR = 0.7;  // touch triggers when below 70% of baseline
+
 // -------------------- Setup --------------------
 void setup() {
   Serial.begin(115200);
+  Serial.println("\n--- DotDash (ESP32 Touch Native) ---");
 
-  // OLED init
   Wire.begin(SDA_PIN, SCL_PIN);
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x12_tf);
-  u8g2.clearBuffer();
-  u8g2.setCursor(0,12);
-  u8g2.print("Starting DotDash...");
-  u8g2.sendBuffer();
 
-  pinMode(TOUCH_PIN, INPUT_PULLDOWN);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // Start WiFi AP
+  // WiFi Access Point
   WiFi.softAP(AP_SSID, AP_PASS);
   IPAddress apIP = WiFi.softAPIP();
-  Serial.print("AP IP: "); Serial.println(apIP);
-
-  // Start DNS server (catch-all)
   dnsServer.start(53, "*", apIP);
 
-  // Web server routes
   webServer.on("/", handleRoot);
   webServer.on("/live", handleLive);
   webServer.onNotFound(handleRoot);
   webServer.begin();
 
-  // Startup beep sequence
-  tone(BUZZER_PIN, 1000, 200); delay(250);
-  tone(BUZZER_PIN, 1200, 200); delay(250);
-  tone(BUZZER_PIN, 1500, 300); delay(350);
+  tone(BUZZER_PIN, 1000, 100); delay(150);
+  tone(BUZZER_PIN, 1500, 150); delay(200);
+
+  // Calibrate baseline
+  Serial.println("Calibrating touch baseline...");
+  long total = 0;
+  for (int i = 0; i < 50; i++) {
+    total += touchRead(TOUCH_PIN);
+    delay(20);
+  }
+  baseLevel = total / 50;
+  touchThreshold = baseLevel * THRESHOLD_FACTOR;
+  Serial.print("Base level: "); Serial.println(baseLevel);
+  Serial.print("Touch threshold: "); Serial.println(touchThreshold);
+
+  u8g2.clearBuffer();
+  u8g2.setCursor(0, 12);
+  u8g2.print("Touch baseline: ");
+  u8g2.print(baseLevel);
+  u8g2.sendBuffer();
 
   Serial.println("DotDash ready!");
 }
 
-// -------------------- Web handlers --------------------
+// -------------------- Web Handlers --------------------
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width'>"
                 "<title>DotDash Portal</title></head><body>"
                 "<h1>DotDash Portal</h1>"
                 "<p>Live Morse input:</p>"
-                "<div id='morse'> </div>"
+                "<div id='morse'></div>"
                 "<script>"
                 "var evtSource = new EventSource('/live');"
-                "evtSource.onmessage = function(e){"
-                "document.getElementById('morse').innerText = e.data;"
-                "};"
+                "evtSource.onmessage = function(e){document.getElementById('morse').innerText = e.data;};"
                 "</script></body></html>";
   webServer.send(200, "text/html", html);
 }
@@ -81,73 +98,76 @@ void handleLive() {
   webServer.sendHeader("Content-Type", "text/event-stream");
   webServer.sendHeader("Cache-Control", "no-cache");
   webServer.sendHeader("Connection", "keep-alive");
-  webServer.send(200, "text/event-stream", liveMorse + "\n\n");
+  webServer.send(200, "text/event-stream", "data: " + liveMorse + "\n\n");
 }
 
-// -------------------- Word-wrap helper --------------------
-void drawWrappedText(String text, int x, int y, int maxWidth, int lineHeight){
-  int start = 0;
-  int len = text.length();
-  while(start < len){
-    int end = start;
-    String line = "";
-    while(end < len){
-      line += text[end];
-      if(u8g2.getStrWidth(line.c_str()) > maxWidth){
-        line.remove(line.length()-1);
-        break;
-      }
-      end++;
-    }
-    u8g2.setCursor(x, y);
-    u8g2.print(line);
-    y += lineHeight;
-    start = end;
-  }
-}
-
-// -------------------- Touch & buzzer --------------------
+// -------------------- Touch detection --------------------
 void checkTouch() {
-  static bool pressed = false;
-  static unsigned long pressStart = 0;
-  static bool symbolAdded = false;  // ensure we only add once
-  int state = digitalRead(TOUCH_PIN);
+  int rawValue = touchRead(TOUCH_PIN);
+  bool touched = (rawValue < touchThreshold);
 
-  if (state && !pressed) {
-    // just pressed
-    pressed = true;
-    pressStart = millis();
-    symbolAdded = false;
-    tone(BUZZER_PIN, 1000);  // start passive buzzer
+  static bool wasTouched = false;
+  static unsigned long touchStart = 0;
+
+  if (touched && !wasTouched) {
+    // Touch started
+    wasTouched = true;
+    touchStart = millis();
+    tone(BUZZER_PIN, 1200);
+    Serial.print("Touch start (value=");
+    Serial.print(rawValue);
+    Serial.println(")");
   }
 
-  if (!state && pressed) {
-    // just released
-    unsigned long duration = millis() - pressStart;
-    noTone(BUZZER_PIN);       // stop buzzer
+  if (!touched && wasTouched) {
+    // Touch released
+    wasTouched = false;
+    noTone(BUZZER_PIN);
+    unsigned long duration = millis() - touchStart;
+    Serial.print("Touch released (value=");
+    Serial.print(rawValue);
+    Serial.print(") duration=");
+    Serial.print(duration);
+    Serial.println("ms");
 
-    // determine symbol
-    String symbol = (duration < 200) ? "." : "-";
+    String symbol = (duration < DOT_TIME) ? "." : "-";
     currentToken += symbol;
-    liveMorse = currentToken; // update browser/OLED
+    liveMorse = currentToken;
 
-    pressed = false;
+    Serial.print("Added symbol: ");
+    Serial.println(symbol);
+
+    // OLED visual
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 12);
+    u8g2.print("Detected: ");
+    u8g2.print(symbol);
+    u8g2.sendBuffer();
   }
+
+  // While holding
+  if (touched) {
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 12);
+    u8g2.print("HOLDING...");
+    u8g2.sendBuffer();
+  }
+
+  delay(20);
 }
 
-
-
-// -------------------- OLED --------------------
-void updateOLED(){
+// -------------------- OLED Update --------------------
+void updateOLED() {
   u8g2.clearBuffer();
-  u8g2.setCursor(0,0);
-  u8g2.print("Morse: "); 
-  drawWrappedText(currentToken, 0, 12, u8g2.getDisplayWidth(), 12);
+  u8g2.setCursor(0, 0);
+  u8g2.print("Morse:");
+  u8g2.setCursor(0, 14);
+  u8g2.print(currentToken);
   u8g2.sendBuffer();
 }
 
-// -------------------- Main loop --------------------
-void loop(){
+// -------------------- Loop --------------------
+void loop() {
   dnsServer.processNextRequest();
   webServer.handleClient();
   checkTouch();
