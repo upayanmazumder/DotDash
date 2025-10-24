@@ -7,7 +7,6 @@
 
 // -------------------- PINS --------------------
 #define TOUCH_PIN 4    // GPIO4 = touch pin on ESP32
-#define BUZZER_PIN 15
 #define SDA_PIN 21
 #define SCL_PIN 22
 
@@ -22,7 +21,9 @@ WebServer webServer(80);
 
 // -------------------- Morse --------------------
 String currentToken = "";
-String liveMorse = "";
+String liveMorse = "";          // full live Morse string (for web)
+String morseLine = "";          // Line 1: only dots/dashes
+String letterLine = "";         // Line 2: decoded letters
 bool translationShown = false;
 
 // -------------------- State --------------------
@@ -65,8 +66,6 @@ void setup() {
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x12_tf);
 
-  pinMode(BUZZER_PIN, OUTPUT);
-
   // WiFi Access Point
   WiFi.softAP(AP_SSID, AP_PASS);
   IPAddress apIP = WiFi.softAPIP();
@@ -76,9 +75,6 @@ void setup() {
   webServer.on("/live", handleLive);
   webServer.onNotFound(handleRoot);
   webServer.begin();
-
-  tone(BUZZER_PIN, 1000, 100); delay(150);
-  tone(BUZZER_PIN, 1500, 150); delay(200);
 
   // Calibrate baseline
   Serial.println("Calibrating touch baseline...");
@@ -111,7 +107,7 @@ void handleRoot() {
                 "setInterval(async()=>{"
                 " const res = await fetch('/live');"
                 " document.getElementById('morse').innerText = await res.text();"
-                "},500);"
+                "},200);"
                 "</script>"
                 "</body></html>";
   webServer.send(200, "text/html", html);
@@ -119,6 +115,15 @@ void handleRoot() {
 
 void handleLive() {
   webServer.send(200, "text/plain", liveMorse);
+}
+
+// -------------------- Scrolling helper --------------------
+void addToScroll(String &line, String s, int maxChars, int labelLength) {
+  line += s;
+  int effectiveMax = maxChars - labelLength;
+  if (line.length() > effectiveMax) {
+    line = line.substring(line.length() - effectiveMax);
+  }
 }
 
 // -------------------- Loop --------------------
@@ -134,56 +139,66 @@ void loop() {
     isPressed = true;
     pressStart = now;
     lastRead = now;
-    tone(BUZZER_PIN, 1000);
   }
 
   // --- Release detection ---
   if (isPressed && reading >= touchThreshold) {
     isPressed = false;
-    noTone(BUZZER_PIN);
     unsigned long pressDuration = now - pressStart;
     lastRelease = now;
 
-    if (pressDuration < DOT_TIME) {
-      currentToken += ".";
-      liveMorse += ".";
-    } else {
-      currentToken += "-";
-      liveMorse += "-";
-    }
-
-    Serial.print("Token: "); Serial.println(currentToken);
+    // Dot or dash
+    String symbol = (pressDuration < DOT_TIME) ? "." : "-";
+    currentToken += symbol;
+    liveMorse += symbol;
+    addToScroll(morseLine, symbol, 28, 7); // "Morse: " label length = 7
   }
 
   // --- Character gap detection ---
   if (!isPressed && currentToken != "" && now - lastRelease > CHAR_GAP) {
     char decoded = '?';
     if (morseTable.count(currentToken)) decoded = morseTable[currentToken];
-    liveMorse += " (";
-    liveMorse += decoded;
-    liveMorse += ")";
-    Serial.print("Decoded: "); Serial.println(decoded);
+    liveMorse += "("; liveMorse += decoded; liveMorse += ")";
+    addToScroll(letterLine, String(decoded), 28, 9); // "Letters: " label length = 9
     currentToken = "";
   }
 
   // --- End of input (10s) ---
   if (!isPressed && now - lastRelease > END_GAP && !translationShown) {
-    Serial.println("End of input. Showing translation.");
     translationShown = true;
-
     u8g2.clearBuffer();
     u8g2.setCursor(0,12);
     u8g2.print("Message: ");
-    u8g2.print(liveMorse);
+    u8g2.print(letterLine);  // <-- only decoded letters
     u8g2.sendBuffer();
   }
 
   // --- OLED live update ---
   if (!translationShown) {
     u8g2.clearBuffer();
+    // Line 1: dots/dashes
     u8g2.setCursor(0,12);
     u8g2.print("Morse: ");
-    u8g2.print(liveMorse);
+    u8g2.print(morseLine);
+    // Line 2: decoded letters
+    u8g2.setCursor(0,26);
+    u8g2.print("Letters: ");
+    u8g2.print(letterLine);
+
+    // --- Progress bar ---
+    const int barWidth = 120;
+    const int barHeight = 6;
+    const int barX = 4;
+    const int barY = 58;
+    u8g2.drawFrame(barX, barY, barWidth, barHeight);
+
+    if (isPressed) {
+      float progress = (float)(now - pressStart) / DOT_TIME;
+      if (progress > 1.0) progress = 1.0;
+      int fill = progress * barWidth;
+      u8g2.drawBox(barX, barY, fill, barHeight);
+    }
+
     u8g2.sendBuffer();
   }
 }
