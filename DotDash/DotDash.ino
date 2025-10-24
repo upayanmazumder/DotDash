@@ -6,7 +6,7 @@
 #include <map>
 
 // -------------------- PINS --------------------
-#define TOUCH_PIN 4    // GPIO4 = touch pin on ESP32
+#define TOUCH_PIN 4
 #define SDA_PIN 21
 #define SCL_PIN 22
 
@@ -21,9 +21,9 @@ WebServer webServer(80);
 
 // -------------------- Morse --------------------
 String currentToken = "";
-String liveMorse = "";          // full live Morse string (for web)
-String morseLine = "";          // Line 1: only dots/dashes
-String letterLine = "";         // Line 2: decoded letters
+String liveMorse = "";      // full Morse for web
+String morseLine = "";      // OLED line 1 dots/dashes
+String letterLine = "";     // OLED line 2 decoded letters
 bool translationShown = false;
 
 // -------------------- State --------------------
@@ -40,8 +40,8 @@ const int DEBOUNCE = 30;            // ms
 const float THRESHOLD_FACTOR = 0.7; // 70% of baseline triggers touch
 
 // -------------------- Gap Detection --------------------
-const unsigned long CHAR_GAP = 3000; // 3s = gap between letters
-const unsigned long END_GAP  = 10000; // 10s = end of input
+const unsigned long CHAR_GAP = 1000;  // 1s gap between letters
+const unsigned long END_GAP  = 5000;  // 5s end of input
 
 // -------------------- Morse Table --------------------
 std::map<String, char> morseTable = {
@@ -60,13 +60,10 @@ std::map<String, char> morseTable = {
 // -------------------- Setup --------------------
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n--- DotDash (ESP32 Touch Native) ---");
-
   Wire.begin(SDA_PIN, SCL_PIN);
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x12_tf);
 
-  // WiFi Access Point
   WiFi.softAP(AP_SSID, AP_PASS);
   IPAddress apIP = WiFi.softAPIP();
   dnsServer.start(53, "*", apIP);
@@ -76,8 +73,7 @@ void setup() {
   webServer.onNotFound(handleRoot);
   webServer.begin();
 
-  // Calibrate baseline
-  Serial.println("Calibrating touch baseline...");
+  // Calibrate touch baseline
   long total = 0;
   for (int i = 0; i < 50; i++) {
     total += touchRead(TOUCH_PIN);
@@ -85,16 +81,6 @@ void setup() {
   }
   baseLevel = total / 50;
   touchThreshold = baseLevel * THRESHOLD_FACTOR;
-  Serial.print("Base level: "); Serial.println(baseLevel);
-  Serial.print("Touch threshold: "); Serial.println(touchThreshold);
-
-  u8g2.clearBuffer();
-  u8g2.setCursor(0, 12);
-  u8g2.print("Touch baseline: ");
-  u8g2.print(baseLevel);
-  u8g2.sendBuffer();
-
-  Serial.println("DotDash ready!");
 }
 
 // -------------------- Web Handlers --------------------
@@ -102,11 +88,15 @@ void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width'>"
                 "<title>DotDash Portal</title></head><body>"
                 "<h1>DotDash Portal</h1>"
-                "<p>Live Morse: <span id='morse'></span></p>"
+                "<div><strong>Morse:</strong> <span id='morse'></span></div>"
+                "<div><strong>Letters:</strong> <span id='letters'></span></div>"
                 "<script>"
                 "setInterval(async()=>{"
                 " const res = await fetch('/live');"
-                " document.getElementById('morse').innerText = await res.text();"
+                " const txt = await res.text();"
+                " const parts = txt.split('|');"
+                " document.getElementById('morse').innerText = parts[0];"
+                " document.getElementById('letters').innerText = parts[1];"
                 "},200);"
                 "</script>"
                 "</body></html>";
@@ -114,15 +104,15 @@ void handleRoot() {
 }
 
 void handleLive() {
-  webServer.send(200, "text/plain", liveMorse);
+  String out = morseLine + "|" + letterLine; // dot-dash | converted
+  webServer.send(200, "text/plain", out);
 }
 
 // -------------------- Scrolling helper --------------------
-void addToScroll(String &line, String s, int maxChars, int labelLength) {
+void addToScroll(String &line, String s, int maxChars) {
   line += s;
-  int effectiveMax = maxChars - labelLength;
-  if (line.length() > effectiveMax) {
-    line = line.substring(line.length() - effectiveMax);
+  if (line.length() > maxChars) {
+    line = line.substring(line.length() - maxChars);
   }
 }
 
@@ -147,11 +137,10 @@ void loop() {
     unsigned long pressDuration = now - pressStart;
     lastRelease = now;
 
-    // Dot or dash
     String symbol = (pressDuration < DOT_TIME) ? "." : "-";
     currentToken += symbol;
     liveMorse += symbol;
-    addToScroll(morseLine, symbol, 28, 7); // "Morse: " label length = 7
+    addToScroll(morseLine, symbol, 28 - 7);  // "Morse: " = 7 chars
   }
 
   // --- Character gap detection ---
@@ -159,28 +148,26 @@ void loop() {
     char decoded = '?';
     if (morseTable.count(currentToken)) decoded = morseTable[currentToken];
     liveMorse += "("; liveMorse += decoded; liveMorse += ")";
-    addToScroll(letterLine, String(decoded), 28, 9); // "Letters: " label length = 9
+    addToScroll(letterLine, String(decoded), 28 - 9); // "Letters: " = 9 chars
     currentToken = "";
   }
 
-  // --- End of input (10s) ---
+  // --- End of input (5s) ---
   if (!isPressed && now - lastRelease > END_GAP && !translationShown) {
     translationShown = true;
     u8g2.clearBuffer();
     u8g2.setCursor(0,12);
     u8g2.print("Message: ");
-    u8g2.print(letterLine);  // <-- only decoded letters
+    u8g2.print(letterLine); // only converted letters
     u8g2.sendBuffer();
   }
 
   // --- OLED live update ---
   if (!translationShown) {
     u8g2.clearBuffer();
-    // Line 1: dots/dashes
     u8g2.setCursor(0,12);
     u8g2.print("Morse: ");
     u8g2.print(morseLine);
-    // Line 2: decoded letters
     u8g2.setCursor(0,26);
     u8g2.print("Letters: ");
     u8g2.print(letterLine);
@@ -191,7 +178,6 @@ void loop() {
     const int barX = 4;
     const int barY = 58;
     u8g2.drawFrame(barX, barY, barWidth, barHeight);
-
     if (isPressed) {
       float progress = (float)(now - pressStart) / DOT_TIME;
       if (progress > 1.0) progress = 1.0;
