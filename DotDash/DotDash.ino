@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <Wire.h>
 #include <U8g2lib.h>
+#include <map>
 
 // -------------------- PINS --------------------
 #define TOUCH_PIN 4    // GPIO4 = touch pin on ESP32
@@ -22,11 +23,13 @@ WebServer webServer(80);
 // -------------------- Morse --------------------
 String currentToken = "";
 String liveMorse = "";
+bool translationShown = false;
 
 // -------------------- State --------------------
 bool isPressed = false;
 unsigned long pressStart = 0;
 unsigned long lastRead = 0;
+unsigned long lastRelease = 0;
 int baseLevel = 0;
 int touchThreshold = 0;
 
@@ -36,9 +39,22 @@ const int DEBOUNCE = 30;            // ms
 const float THRESHOLD_FACTOR = 0.7; // 70% of baseline triggers touch
 
 // -------------------- Gap Detection --------------------
-unsigned long lastRelease = 0;
 const unsigned long CHAR_GAP = 3000; // 3s = gap between letters
 const unsigned long END_GAP  = 10000; // 10s = end of input
+
+// -------------------- Morse Table --------------------
+std::map<String, char> morseTable = {
+  {".-", 'A'}, {"-...", 'B'}, {"-.-.", 'C'}, {"-..", 'D'},
+  {".", 'E'}, {"..-.", 'F'}, {"--.", 'G'}, {"....", 'H'},
+  {"..", 'I'}, {".---", 'J'}, {"-.-", 'K'}, {".-..", 'L'},
+  {"--", 'M'}, {"-.", 'N'}, {"---", 'O'}, {".--.", 'P'},
+  {"--.-", 'Q'}, {".-.", 'R'}, {"...", 'S'}, {"-", 'T'},
+  {"..-", 'U'}, {"...-", 'V'}, {".--", 'W'}, {"-..-", 'X'},
+  {"-.--", 'Y'}, {"--..", 'Z'},
+  {"-----",'0'}, {".----",'1'}, {"..---",'2'}, {"...--",'3'},
+  {"....-",'4'}, {".....",'5'}, {"-....",'6'}, {"--...",'7'},
+  {"---..",'8'}, {"----.",'9'}
+};
 
 // -------------------- Setup --------------------
 void setup() {
@@ -113,18 +129,18 @@ void loop() {
   int reading = touchRead(TOUCH_PIN);
   unsigned long now = millis();
 
-  // Touch detection
+  // --- Touch detection ---
   if (reading < touchThreshold && !isPressed && now - lastRead > DEBOUNCE) {
     isPressed = true;
     pressStart = now;
+    lastRead = now;
     tone(BUZZER_PIN, 1000);
   }
 
-  // Release detection
+  // --- Release detection ---
   if (isPressed && reading >= touchThreshold) {
     isPressed = false;
     noTone(BUZZER_PIN);
-
     unsigned long pressDuration = now - pressStart;
     lastRelease = now;
 
@@ -136,14 +152,38 @@ void loop() {
       liveMorse += "-";
     }
 
-    Serial.print("Token: ");
-    Serial.println(currentToken);
+    Serial.print("Token: "); Serial.println(currentToken);
   }
 
-  // Gap detection (clear after end gap)
-  if (!isPressed && now - lastRelease > END_GAP && currentToken != "") {
-    Serial.println("End of input.");
+  // --- Character gap detection ---
+  if (!isPressed && currentToken != "" && now - lastRelease > CHAR_GAP) {
+    char decoded = '?';
+    if (morseTable.count(currentToken)) decoded = morseTable[currentToken];
+    liveMorse += " (";
+    liveMorse += decoded;
+    liveMorse += ")";
+    Serial.print("Decoded: "); Serial.println(decoded);
     currentToken = "";
-    liveMorse += " ";
+  }
+
+  // --- End of input (10s) ---
+  if (!isPressed && now - lastRelease > END_GAP && !translationShown) {
+    Serial.println("End of input. Showing translation.");
+    translationShown = true;
+
+    u8g2.clearBuffer();
+    u8g2.setCursor(0,12);
+    u8g2.print("Message: ");
+    u8g2.print(liveMorse);
+    u8g2.sendBuffer();
+  }
+
+  // --- OLED live update ---
+  if (!translationShown) {
+    u8g2.clearBuffer();
+    u8g2.setCursor(0,12);
+    u8g2.print("Morse: ");
+    u8g2.print(liveMorse);
+    u8g2.sendBuffer();
   }
 }
