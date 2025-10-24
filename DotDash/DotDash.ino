@@ -5,7 +5,7 @@
 #include <U8g2lib.h>
 
 // -------------------- PINS --------------------
-#define TOUCH_PIN T0  // GPIO 4 = T0 touch pin on ESP32
+#define TOUCH_PIN 4    // GPIO4 = touch pin on ESP32
 #define BUZZER_PIN 15
 #define SDA_PIN 21
 #define SCL_PIN 22
@@ -31,9 +31,14 @@ int baseLevel = 0;
 int touchThreshold = 0;
 
 // -------------------- Config --------------------
-const int DOT_TIME = 200;  // milliseconds
-const int DEBOUNCE = 30;   // ms
-const float THRESHOLD_FACTOR = 0.7;  // touch triggers when below 70% of baseline
+const int DOT_TIME = 200;           // ms
+const int DEBOUNCE = 30;            // ms
+const float THRESHOLD_FACTOR = 0.7; // 70% of baseline triggers touch
+
+// -------------------- Gap Detection --------------------
+unsigned long lastRelease = 0;
+const unsigned long CHAR_GAP = 3000; // 3s = gap between letters
+const unsigned long END_GAP  = 10000; // 10s = end of input
 
 // -------------------- Setup --------------------
 void setup() {
@@ -85,91 +90,60 @@ void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width'>"
                 "<title>DotDash Portal</title></head><body>"
                 "<h1>DotDash Portal</h1>"
-                "<p>Live Morse input:</p>"
-                "<div id='morse'></div>"
+                "<p>Live Morse: <span id='morse'></span></p>"
                 "<script>"
-                "var evtSource = new EventSource('/live');"
-                "evtSource.onmessage = function(e){document.getElementById('morse').innerText = e.data;};"
-                "</script></body></html>";
+                "setInterval(async()=>{"
+                " const res = await fetch('/live');"
+                " document.getElementById('morse').innerText = await res.text();"
+                "},500);"
+                "</script>"
+                "</body></html>";
   webServer.send(200, "text/html", html);
 }
 
 void handleLive() {
-  webServer.sendHeader("Content-Type", "text/event-stream");
-  webServer.sendHeader("Cache-Control", "no-cache");
-  webServer.sendHeader("Connection", "keep-alive");
-  webServer.send(200, "text/event-stream", "data: " + liveMorse + "\n\n");
-}
-
-// -------------------- Touch detection --------------------
-void checkTouch() {
-  int rawValue = touchRead(TOUCH_PIN);
-  bool touched = (rawValue < touchThreshold);
-
-  static bool wasTouched = false;
-  static unsigned long touchStart = 0;
-
-  if (touched && !wasTouched) {
-    // Touch started
-    wasTouched = true;
-    touchStart = millis();
-    tone(BUZZER_PIN, 1200);
-    Serial.print("Touch start (value=");
-    Serial.print(rawValue);
-    Serial.println(")");
-  }
-
-  if (!touched && wasTouched) {
-    // Touch released
-    wasTouched = false;
-    noTone(BUZZER_PIN);
-    unsigned long duration = millis() - touchStart;
-    Serial.print("Touch released (value=");
-    Serial.print(rawValue);
-    Serial.print(") duration=");
-    Serial.print(duration);
-    Serial.println("ms");
-
-    String symbol = (duration < DOT_TIME) ? "." : "-";
-    currentToken += symbol;
-    liveMorse = currentToken;
-
-    Serial.print("Added symbol: ");
-    Serial.println(symbol);
-
-    // OLED visual
-    u8g2.clearBuffer();
-    u8g2.setCursor(0, 12);
-    u8g2.print("Detected: ");
-    u8g2.print(symbol);
-    u8g2.sendBuffer();
-  }
-
-  // While holding
-  if (touched) {
-    u8g2.clearBuffer();
-    u8g2.setCursor(0, 12);
-    u8g2.print("HOLDING...");
-    u8g2.sendBuffer();
-  }
-
-  delay(20);
-}
-
-// -------------------- OLED Update --------------------
-void updateOLED() {
-  u8g2.clearBuffer();
-  u8g2.setCursor(0, 0);
-  u8g2.print("Morse:");
-  u8g2.setCursor(0, 14);
-  u8g2.print(currentToken);
-  u8g2.sendBuffer();
+  webServer.send(200, "text/plain", liveMorse);
 }
 
 // -------------------- Loop --------------------
 void loop() {
   dnsServer.processNextRequest();
   webServer.handleClient();
-  checkTouch();
-  updateOLED();
+
+  int reading = touchRead(TOUCH_PIN);
+  unsigned long now = millis();
+
+  // Touch detection
+  if (reading < touchThreshold && !isPressed && now - lastRead > DEBOUNCE) {
+    isPressed = true;
+    pressStart = now;
+    tone(BUZZER_PIN, 1000);
+  }
+
+  // Release detection
+  if (isPressed && reading >= touchThreshold) {
+    isPressed = false;
+    noTone(BUZZER_PIN);
+
+    unsigned long pressDuration = now - pressStart;
+    lastRelease = now;
+
+    if (pressDuration < DOT_TIME) {
+      currentToken += ".";
+      liveMorse += ".";
+    } else {
+      currentToken += "-";
+      liveMorse += "-";
+    }
+
+    Serial.print("Token: ");
+    Serial.println(currentToken);
+  }
+
+  // Gap detection (clear after end gap)
+  if (!isPressed && now - lastRelease > END_GAP && currentToken != "") {
+    Serial.println("End of input.");
+    currentToken = "";
+    liveMorse += " ";
+  }
 }
