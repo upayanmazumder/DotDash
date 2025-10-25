@@ -118,4 +118,3 @@ The portal updates every 200ms for near real-time feedback.
 </table>  
 
 ---
-```
