@@ -1,84 +1,121 @@
 # DotDash  
 
-**Design and Implementation of an ESP32-Based Morse Communication System**  
+**ESP32-Based Real-Time Morse Code Communication System**  
 
 ---
 
 ## Overview  
 
-DotDash is a **Morse code communication system** built entirely on an **ESP32**, with wireless networking, user interfacing, and display.  
+DotDash is a **real-time Morse code communication system** implemented entirely on an **ESP32**, combining **touch input**, **OLED display**, and a **live web portal**.  
 
-Users input Morse code via a **touch-sensitive pad**, and the system provides immediate feedback on a **128x64 OLED**:  
+Users input Morse code through a **touch-sensitive pin**, and the system provides **instant feedback**:  
 
-- **Line 1:** Scrolling dots and dashes representing raw Morse input  
-- **Line 2:** Decoded letters as they are interpreted  
-- **Progress bar:** Shows how long a touch must be held to differentiate **dot** vs **dash**  
+- **Line 1 (OLED):** Scrolling dots and dashes representing raw Morse input  
+- **Line 2 (OLED):** Decoded letters as they are interpreted  
+- **Progress bar (OLED):** Visual indicator of touch duration, showing dot vs dash  
 
-A **local web portal** displays live Morse input and translated text in separate, clearly formatted sections.  
+The **local web interface** mirrors the OLED display, updating live:  
 
-The system automatically detects:  
+- **Raw Morse** in one section  
+- **Decoded letters** in another  
 
-- **Letter gaps** (1s) to update decoded letters  
-- **End of input** (5s) to finalize the message display on OLED and web  
+DotDash automatically detects:  
 
-This design demonstrates **real-time Morse code input and translation** using just an ESP32, providing:  
+- **Letter gaps (1s):** Converts current Morse token to a letter  
+- **End of input (5s):** Finalizes the message display on OLED and in the web portal  
 
-- Immediate visual feedback for input duration  
-- Real-time translation of Morse code to readable text  
-- Web-based monitoring and accessibility  
+Additionally, live **Serial Monitor output** mirrors the OLED and web portal, enabling debugging or monitoring via USB.
 
 ---
 
 ## Key Features  
 
-1. **Touch-Based Input:** Single touch pin differentiates dots and dashes with precise timing.  
-2. **OLED Feedback:** Scrolling Morse and decoded letters for immediate user feedback.  
-3. **Web Interface:** Live update of both raw Morse and translated text.  
-4. **Automatic Decoding:** Letters decoded after 1s of inactivity, final message finalized after 5s.  
-5. **Configurable Timing:** DOT/DASH thresholds, letter gaps, and end-of-message delays adjustable in code.  
+1. **Touch-Based Morse Input:** Single pin differentiates dots (`.`) and dashes (`-`) based on press duration.  
+2. **OLED Feedback:** Live scrolling display of Morse symbols and decoded letters.  
+3. **Progress Visualization:** Horizontal bar indicates touch duration; glow appears after DOT threshold is crossed.  
+4. **Web Interface:** Access via ESP32 Wi-Fi AP; live updates of Morse and decoded letters.  
+5. **Automatic Decoding:** Detects letter gaps and message completion automatically.  
+6. **Configurable Timings:** Adjust `DOT_TIME`, `CHAR_GAP`, `END_GAP`, and other parameters to suit user preference.  
+7. **Serial Monitor Integration:** Real-time output of Morse and decoded letters for development and monitoring.  
 
 ---
 
 ## Implementation Notes  
 
-- **ESP32:** Handles Wi-Fi Access Point, web server, OLED display, touch reading, scrolling logic, and progress bar animation  
-- **Web Portal:** Separate divs for raw Morse (`.`/`-`) and decoded letters  
-- **Timing Parameters:** `CHAR_GAP = 1s`, `END_GAP = 5s` for responsive letter decoding and final message display  
-- **Visual Feedback:** Horizontal progress bar shows touch duration for dot vs dash  
+- **ESP32 Responsibilities:** Wi-Fi Access Point, DNS redirect, web server, OLED control, touch input reading, scrolling logic, progress bar animation, and live Serial output.  
+- **Touch Input:** Uses `touchRead()` to detect touch events and differentiate dots vs dashes.  
+- **OLED Display:** Scrolling Morse line, decoded letter line, and touch progress bar with visual DOT threshold indicator.  
+- **Web Portal:** Two separate divs for live Morse symbols and decoded letters; updates every 200ms.  
+- **Timing Parameters:**  
+
+| Parameter     | Default | Description                  |
+|---------------|---------|------------------------------|
+| `DOT_TIME`    | 200 ms  | Max duration for a dot       |
+| `DASH_TIME`   | 3 × DOT_TIME | Max duration for a dash |
+| `CHAR_GAP`    | 1 s     | Gap to detect end of letter  |
+| `END_GAP`     | 5 s     | Gap to detect end of message |
+
+- **Morse Table:** Supports A–Z and 0–9; easily extendable.  
 
 ---
 
-## Contributors
+## Serial Monitor Example  
+
+```
+
+Pressed!
+Released! Duration: 150 ms | Symbol: .
+Current token: .
+Decoded char: E
+Live Morse: . | Letters: E
+Message complete: HELLO
+
+```
+
+---
+
+## Web Portal Example  
+
+- **Raw Morse:** `. - ..`  
+- **Decoded Letters:** `HEL`  
+
+The portal updates every 200ms for near real-time feedback.
+
+---
+
+## Usage  
+
+1. Flash the ESP32 with the DotDash firmware.  
+2. Connect to the Wi-Fi network `DotDash`.  
+3. Open a browser and navigate to `http://192.168.4.1/`.  
+4. Touch the pad to input Morse code:  
+   - Short press = dot  
+   - Long press = dash  
+5. Watch the OLED and web portal for live feedback.  
+6. Wait 1 second for letter decoding or 5 seconds for the message to finalize.  
+
+---
+
+## Contributors  
 
 <table>
 	<tr align="center">
 		<td>
-		Upayan Mazumder
-		<p align="center">
-			<img src = "https://upayan.dev/upayan.webp" width="150" height="150" alt="Upayan Mazumder">
-		</p>
+			Upayan Mazumder
 			<p align="center">
-				<a href = "https://github.com/upayanmazumder">
-					<img src = "http://www.iconninja.com/files/241/825/211/round-collaboration-social-github-code-circle-network-icon.svg" width="36" height = "36" alt="GitHub"/>
-				</a>
-				<a href = "https://www.linkedin.com/in/upayanmazumder">
-					<img src = "http://www.iconninja.com/files/863/607/751/network-linkedin-social-connection-circular-circle-media-icon.svg" width="36" height="36" alt="LinkedIn"/>
-				</a>
+				<img src="https://upayan.dev/upayan.webp" width="150" height="150" alt="Upayan Mazumder">
 			</p>
-		</td>
-		<td>
-		Upayan Mazumder
-		<p align="center">
-			<img src = "https://upayan.dev/upayan.webp" width="150" height="150" alt="Upayan Mazumder">
-		</p>
 			<p align="center">
-				<a href = "https://github.com/upayanmazumder">
-					<img src = "http://www.iconninja.com/files/241/825/211/round-collaboration-social-github-code-circle-network-icon.svg" width="36" height = "36" alt="GitHub"/>
+				<a href="https://github.com/upayanmazumder">
+					<img src="http://www.iconninja.com/files/241/825/211/round-collaboration-social-github-code-circle-network-icon.svg" width="36" height="36" alt="GitHub"/>
 				</a>
-				<a href = "https://www.linkedin.com/in/upayanmazumder">
-					<img src = "http://www.iconninja.com/files/863/607/751/network-linkedin-social-connection-circular-circle-media-icon.svg" width="36" height="36" alt="LinkedIn"/>
+				<a href="https://www.linkedin.com/in/upayanmazumder">
+					<img src="http://www.iconninja.com/files/863/607/751/network-linkedin-social-connection-circular-circle-media-icon.svg" width="36" height="36" alt="LinkedIn"/>
 				</a>
 			</p>
 		</td>
 	</tr>
-</table>
+</table>  
+
+---
+```
