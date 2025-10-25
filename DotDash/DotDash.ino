@@ -46,14 +46,14 @@ const unsigned long DASH_TIME = 3 * DOT_TIME;
 std::map<String, char> morseTable = {
   {".-", 'A'}, {"-...", 'B'}, {"-.-.", 'C'}, {"-..", 'D'},
   {".", 'E'}, {"..-.", 'F'}, {"--.", 'G'}, {"....", 'H'},
-  {"..", 'I'}, {".", 'J'}, {"-.-", 'K'}, {".-..", 'L'},
-  {"--", 'M'}, {"-.", 'N'}, {"", 'O'}, {".--.", 'P'},
+  {"..", 'I'}, {".---", 'J'}, {"-.-", 'K'}, {".-..", 'L'},
+  {"--", 'M'}, {"-.", 'N'}, {"---", 'O'}, {".--.", 'P'},
   {"--.-", 'Q'}, {".-.", 'R'}, {"...", 'S'}, {"-", 'T'},
   {"..-", 'U'}, {"...-", 'V'}, {".--", 'W'}, {"-..-", 'X'},
   {"-.--", 'Y'}, {"--..", 'Z'},
-  {"--",'0'}, {".-",'1'}, {"..",'2'}, {"...--",'3'},
+  {"-----",'0'}, {".----",'1'}, {"..---",'2'}, {"...--",'3'},
   {"....-",'4'}, {".....",'5'}, {"-....",'6'}, {"--...",'7'},
-  {"..",'8'}, {"-.",'9'}
+  {"---..",'8'}, {"----.",'9'}
 };
 
 //  Setup 
@@ -81,6 +81,10 @@ void setup() {
   baseLevel = total / 50;
   touchThreshold = baseLevel * THRESHOLD_FACTOR;
   lastRelease = millis();
+
+  Serial.println("DotDash ESP32 Morse Started");
+  Serial.print("Touch baseline: "); Serial.println(baseLevel);
+  Serial.print("Touch threshold: "); Serial.println(touchThreshold);
 }
 
 //  Web Handlers 
@@ -129,6 +133,7 @@ void loop() {
     isPressed = true;
     pressStart = now;
     lastRead = now;
+    Serial.println("Pressed!");
   }
 
   //  Release detection 
@@ -140,6 +145,10 @@ void loop() {
     String symbol = (pressDuration < DOT_TIME) ? "." : "-";
     currentToken += symbol;
     addToScroll(morseLine, symbol, 28 - 7);
+
+    Serial.print("Released! Duration: "); Serial.print(pressDuration);
+    Serial.print(" ms | Symbol: "); Serial.println(symbol);
+    Serial.print("Current token: "); Serial.println(currentToken);
   }
 
   //  Character gap detection 
@@ -147,6 +156,7 @@ void loop() {
     char decoded = '?';
     if (morseTable.count(currentToken)) decoded = morseTable[currentToken];
     addToScroll(letterLine, String(decoded), 28 - 9);
+    Serial.print("Decoded char: "); Serial.println(decoded);
     morseLine = "";
     currentToken = "";
   }
@@ -154,6 +164,8 @@ void loop() {
   //  End of input (5s) 
   if (!isPressed && now - lastRelease > END_GAP && !translationShown) {
     translationShown = true;
+    Serial.println("Message complete: " + letterLine);
+
     u8g2.clearBuffer();
     u8g2.setCursor(0, 12);
     u8g2.print("Message: ");
@@ -194,5 +206,9 @@ void loop() {
     }
 
     u8g2.sendBuffer();
+
+    // Serial live update (like web)
+    Serial.print("Live Morse: "); Serial.print(morseLine);
+    Serial.print(" | Letters: "); Serial.println(letterLine);
   }
 }
