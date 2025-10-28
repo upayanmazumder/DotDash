@@ -27,7 +27,7 @@ const unsigned long END_GAP = 4000;
 const float THRESHOLD_FACTOR = 0.7;
 
 // State variables for detecting touch and Morse
-bool Q_press = false;
+bool flipFlop_Q = false;
 unsigned long pressStart = 0;
 unsigned long lastRelease = 0;
 int baseLevel = 0;
@@ -149,13 +149,13 @@ void loop() {
   unsigned long now = millis();
 
   // Detect touch event
-  if (reading < touchThreshold && !Q_press && now - lastRelease > DEBOUNCE) {
-    Q_press = true;
+  if (reading < touchThreshold && !flipFlop_Q && now - lastRelease > DEBOUNCE) {
+    flipFlop_Q = true;
     pressStart = now;
   }
 
-  if (Q_press && reading >= touchThreshold) {
-    Q_press = false;
+  if (flipFlop_Q && reading >= touchThreshold) {
+    flipFlop_Q = false;
     unsigned long pressDuration = now - pressStart;
     lastRelease = now;
 
@@ -165,7 +165,7 @@ void loop() {
   }
 
   // Morse code to letter decoding
-  if (!Q_press && currentToken != "" && now - lastRelease > CHAR_GAP) {
+  if (!flipFlop_Q && currentToken != "" && now - lastRelease > CHAR_GAP) {
     char decoded = '?';
     if (currentToken == ".-") decoded = 'A';
     else if (currentToken == "-...") decoded = 'B';
@@ -210,7 +210,7 @@ void loop() {
   }
 
   // Display the decoded message after delay
-  if (!Q_press && now - lastRelease > END_GAP && !translationShown) {
+  if (!flipFlop_Q && now - lastRelease > END_GAP && !translationShown) {
     translationShown = true;
     u8g2.clearBuffer();
     u8g2.setCursor(0, 12);
@@ -236,7 +236,7 @@ void loop() {
     const int barY = 58;
     u8g2.drawFrame(barX, barY, barWidth, barHeight);
 
-    if (Q_press) {
+    if (flipFlop_Q) {
       float progress = (float)(now - pressStart) / (float)DASH_TIME;
       if (progress > 1.0) progress = 1.0;
       int fill = progress * barWidth;
