@@ -14,11 +14,11 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, SCL_PIN, SDA_PI
 
 // WiFi AP Setup
 const char* AP_SSID = "DotDash-DSD";
-const char* AP_PASS = ""; // Empty password for open network
+const char* AP_PASS = "";
 DNSServer dnsServer;
 WebServer webServer(80);
 
-// Timing for Morse code
+// Timing
 const int DOT_TIME = 200;
 const int DASH_TIME = 600;
 const int DEBOUNCE = 30;
@@ -26,76 +26,121 @@ const unsigned long CHAR_GAP = 1000;
 const unsigned long END_GAP = 4000;
 const float THRESHOLD_FACTOR = 0.7;
 
-// State variables for detecting touch and Morse
-bool flipFlop_Q = false;
+// State variables
+bool Q_press = false;
 unsigned long pressStart = 0;
 unsigned long lastRelease = 0;
 int baseLevel = 0;
 int touchThreshold = 0;
 
-// Buffers for Morse and letters
+// Buffers
 String morseLine = "";
 String decodedMessage = "";
 String currentToken = "";
 bool translationShown = false;
 
-// Morse code encoding for A-Z and 0-9
+// Morse code lookup table
+const char* MORSE_TABLE[] = {
+  ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....",
+  "..", ".---", "-.-", ".-..", "--", "-.", "---", ".--.",
+  "--.-", ".-.", "...", "-", "..-", "...-", ".--", "-..-",
+  "-.--", "--.."
+};
+
+// Digital Logic Gate Simulation
+bool AND(bool a, bool b) { return a && b; }
+bool OR(bool a, bool b) { return a || b; }
+bool NOT(bool a) { return !a; }
+bool XOR(bool a, bool b) { return (a != b); }
+
+// Encode using logic gates (complete A-Z) - ALL using 5 bits
 String encodeToMorse(char input) {
-  switch (input) {
-    case 'A': return ".-";
-    case 'B': return "-...";
-    case 'C': return "-.-.";
-    case 'D': return "-..";
-    case 'E': return ".";
-    case 'F': return "..-.";
-    case 'G': return "--.";
-    case 'H': return "....";
-    case 'I': return "..";
-    case 'J': return ".---";
-    case 'K': return "-.-";
-    case 'L': return ".-..";
-    case 'M': return "--";
-    case 'N': return "-.";
-    case 'O': return "---";
-    case 'P': return ".--.";
-    case 'Q': return "--.-";
-    case 'R': return ".-.";
-    case 'S': return "...";
-    case 'T': return "-";
-    case 'U': return "..-";
-    case 'V': return "...-";
-    case 'W': return ".--";
-    case 'X': return "-..-";
-    case 'Y': return "-.--";
-    case 'Z': return "--..";
-    case '0': return "-----";
-    case '1': return ".----";
-    case '2': return "..---";
-    case '3': return "...--";
-    case '4': return "....-";
-    case '5': return ".....";
-    case '6': return "-....";
-    case '7': return "--...";
-    case '8': return "---..";
-    case '9': return "----.";
-    default: return "?"; // Error case for unsupported characters
-  }
+  char c = toupper(input);
+  int val = c - 'A';  // Convert A-Z to 0-25
+  
+  if (val < 0 || val > 25) return "?";
+  
+  // Extract 5 bits using logic gates (b4 b3 b2 b1 b0)
+  bool b0 = (val & 0x01);
+  bool b1 = (val & 0x02) >> 1;
+  bool b2 = (val & 0x04) >> 2;
+  bool b3 = (val & 0x08) >> 3;
+  bool b4 = (val & 0x10) >> 4;
+
+  // A = 0 (00000)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(NOT(b2), NOT(b1))) && NOT(b0)) return ".-";
+  // B = 1 (00001)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(NOT(b2), NOT(b1))) && b0) return "-...";
+  // C = 2 (00010)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(NOT(b2), b1)) && NOT(b0)) return "-.-.";
+  // D = 3 (00011)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(NOT(b2), b1)) && b0) return "-..";
+  // E = 4 (00100)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(b2, NOT(b1))) && NOT(b0)) return ".";
+  // F = 5 (00101)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(b2, NOT(b1))) && b0) return "..-.";
+  // G = 6 (00110)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(b2, b1)) && NOT(b0)) return "--.";
+  // H = 7 (00111)
+  if (AND(AND(NOT(b4), NOT(b3)), AND(b2, b1)) && b0) return "....";
+  // I = 8 (01000)
+  if (AND(AND(NOT(b4), b3), AND(NOT(b2), NOT(b1))) && NOT(b0)) return "..";
+  // J = 9 (01001)
+  if (AND(AND(NOT(b4), b3), AND(NOT(b2), NOT(b1))) && b0) return ".---";
+  // K = 10 (01010)
+  if (AND(AND(NOT(b4), b3), AND(NOT(b2), b1)) && NOT(b0)) return "-.-";
+  // L = 11 (01011)
+  if (AND(AND(NOT(b4), b3), AND(NOT(b2), b1)) && b0) return ".-..";
+  // M = 12 (01100)
+  if (AND(AND(NOT(b4), b3), AND(b2, NOT(b1))) && NOT(b0)) return "--";
+  // N = 13 (01101)
+  if (AND(AND(NOT(b4), b3), AND(b2, NOT(b1))) && b0) return "-.";
+  // O = 14 (01110)
+  if (AND(AND(NOT(b4), b3), AND(b2, b1)) && NOT(b0)) return "---";
+  // P = 15 (01111)
+  if (AND(AND(NOT(b4), b3), AND(b2, b1)) && b0) return ".--.";
+  // Q = 16 (10000)
+  if (AND(AND(b4, NOT(b3)), AND(NOT(b2), NOT(b1))) && NOT(b0)) return "--.-";
+  // R = 17 (10001)
+  if (AND(AND(b4, NOT(b3)), AND(NOT(b2), NOT(b1))) && b0) return ".-.";
+  // S = 18 (10010)
+  if (AND(AND(b4, NOT(b3)), AND(NOT(b2), b1)) && NOT(b0)) return "...";
+  // T = 19 (10011)
+  if (AND(AND(b4, NOT(b3)), AND(NOT(b2), b1)) && b0) return "-";
+  // U = 20 (10100)
+  if (AND(AND(b4, NOT(b3)), AND(b2, NOT(b1))) && NOT(b0)) return "..-";
+  // V = 21 (10101)
+  if (AND(AND(b4, NOT(b3)), AND(b2, NOT(b1))) && b0) return "...-";
+  // W = 22 (10110)
+  if (AND(AND(b4, NOT(b3)), AND(b2, b1)) && NOT(b0)) return ".--";
+  // X = 23 (10111)
+  if (AND(AND(b4, NOT(b3)), AND(b2, b1)) && b0) return "-..-";
+  // Y = 24 (11000)
+  if (AND(AND(b4, b3), AND(NOT(b2), NOT(b1))) && NOT(b0)) return "-.--";
+  // Z = 25 (11001)
+  if (AND(AND(b4, b3), AND(NOT(b2), NOT(b1))) && b0) return "--..";
+
+  return "?";
 }
 
-// Web interface handlers
+// Web interface
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width'>"
+                "<style>body{font-family:Arial;padding:20px;background:#1a1a1a;color:#0f0}"
+                "h1{color:#0f0;text-shadow:0 0 10px #0f0}"
+                ".box{background:#000;border:2px solid #0f0;padding:15px;margin:10px 0;border-radius:5px}"
+                ".label{color:#0a0;font-size:14px}.value{font-size:20px;font-weight:bold;font-family:monospace}</style>"
                 "<title>DotDash DSD</title></head><body>"
-                "<h1>DotDash (DSD Simulation)</h1>"
-                "<div><strong>Morse:</strong> <span id='morse'></span></div>"
-                "<div><strong>Letters:</strong> <span id='letters'></span></div>"
+                "<h1>⚡ DotDash DSD ⚡</h1>"
+                "<div class='box'><div class='label'>MORSE CODE:</div><div class='value' id='morse'>---</div></div>"
+                "<div class='box'><div class='label'>DECODED:</div><div class='value' id='letters'>...</div></div>"
                 "<script>"
                 "setInterval(async()=>{"
-                " const res = await fetch('/live');"
-                " const txt = await res.text();"
-                " const parts = txt.split('|');"
-                " document.getElementById('morse').innerText = parts[0];"
-                " document.getElementById('letters').innerText = parts[1];"
+                "const res=await fetch('/live');"
+                "const txt=await res.text();"
+                "const parts=txt.split('|');"
+                "document.getElementById('morse').innerText=parts[0]||'---';"
+                "document.getElementById('letters').innerText=parts[1]||'...';"
                 "},200);"
                 "</script></body></html>";
   webServer.send(200, "text/html", html);
@@ -106,20 +151,17 @@ void handleLive() {
   webServer.send(200, "text/plain", out);
 }
 
-// Helper function for scrolling the display
 void addToScroll(String &line, String s, int maxChars) {
   line += s;
   if (line.length() > maxChars) line = line.substring(line.length() - maxChars);
 }
 
-// Setup function
 void setup() {
   Serial.begin(115200);
   Wire.begin(SDA_PIN, SCL_PIN);
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x12_tf);
 
-  // Set up WiFi access point
   WiFi.softAP(AP_SSID, AP_PASS);
   IPAddress apIP = WiFi.softAPIP();
   dnsServer.start(53, "*", apIP);
@@ -127,7 +169,6 @@ void setup() {
   webServer.on("/live", handleLive);
   webServer.begin();
 
-  // Touch sensor baseline calibration
   long total = 0;
   for (int i = 0; i < 50; i++) {
     total += touchRead(TOUCH_PIN);
@@ -135,12 +176,13 @@ void setup() {
   }
   baseLevel = total / 50;
   touchThreshold = baseLevel * THRESHOLD_FACTOR;
-
   lastRelease = millis();
-  Serial.println("DSD Morse Encoder Started");
+
+  Serial.println("DSD Morse Encoder Started (A-Z Complete)");
+  Serial.print("Access at: ");
+  Serial.println(apIP);
 }
 
-// Main loop function
 void loop() {
   dnsServer.processNextRequest();
   webServer.handleClient();
@@ -148,24 +190,22 @@ void loop() {
   int reading = touchRead(TOUCH_PIN);
   unsigned long now = millis();
 
-  // Detect touch event
-  if (reading < touchThreshold && !flipFlop_Q && now - lastRelease > DEBOUNCE) {
-    flipFlop_Q = true;
+  if (reading < touchThreshold && !Q_press && now - lastRelease > DEBOUNCE) {
+    Q_press = true;
     pressStart = now;
   }
 
-  if (flipFlop_Q && reading >= touchThreshold) {
-    flipFlop_Q = false;
+  if (Q_press && reading >= touchThreshold) {
+    Q_press = false;
     unsigned long pressDuration = now - pressStart;
     lastRelease = now;
-
     String symbol = (pressDuration < DOT_TIME) ? "." : "-";
     addToScroll(morseLine, symbol, 24);
     currentToken += symbol;
   }
 
-  // Morse code to letter decoding
-  if (!flipFlop_Q && currentToken != "" && now - lastRelease > CHAR_GAP) {
+  // Decode Morse to letter (A–Z)
+  if (!Q_press && currentToken != "" && now - lastRelease > CHAR_GAP) {
     char decoded = '?';
     if (currentToken == ".-") decoded = 'A';
     else if (currentToken == "-...") decoded = 'B';
@@ -193,24 +233,13 @@ void loop() {
     else if (currentToken == "-..-") decoded = 'X';
     else if (currentToken == "-.--") decoded = 'Y';
     else if (currentToken == "--..") decoded = 'Z';
-    else if (currentToken == "-----") decoded = '0';
-    else if (currentToken == ".----") decoded = '1';
-    else if (currentToken == "..---") decoded = '2';
-    else if (currentToken == "...--") decoded = '3';
-    else if (currentToken == "....-") decoded = '4';
-    else if (currentToken == ".....") decoded = '5';
-    else if (currentToken == "-....") decoded = '6';
-    else if (currentToken == "--...") decoded = '7';
-    else if (currentToken == "---..") decoded = '8';
-    else if (currentToken == "----.") decoded = '9';
 
     addToScroll(decodedMessage, String(decoded), 20);
     currentToken = "";
     morseLine = "";
   }
 
-  // Display the decoded message after delay
-  if (!flipFlop_Q && now - lastRelease > END_GAP && !translationShown) {
+  if (!Q_press && now - lastRelease > END_GAP && !translationShown) {
     translationShown = true;
     u8g2.clearBuffer();
     u8g2.setCursor(0, 12);
@@ -219,7 +248,6 @@ void loop() {
     u8g2.sendBuffer();
   }
 
-  // OLED live update for Morse code
   if (!translationShown) {
     u8g2.clearBuffer();
     u8g2.setCursor(0, 12);
@@ -229,14 +257,13 @@ void loop() {
     u8g2.print("Letters: ");
     u8g2.print(decodedMessage);
 
-    // Signal bar simulation for press duration
     const int barWidth = 120;
     const int barHeight = 6;
     const int barX = 4;
     const int barY = 58;
     u8g2.drawFrame(barX, barY, barWidth, barHeight);
 
-    if (flipFlop_Q) {
+    if (Q_press) {
       float progress = (float)(now - pressStart) / (float)DASH_TIME;
       if (progress > 1.0) progress = 1.0;
       int fill = progress * barWidth;
