@@ -35,7 +35,7 @@ int touchThreshold = 0;
 
 // Buffers for Morse and letters
 String morseLine = "";
-String letterLine = "";
+String decodedMessage = "";
 String currentToken = "";
 bool translationShown = false;
 
@@ -102,7 +102,7 @@ void handleRoot() {
 }
 
 void handleLive() {
-  String out = morseLine + "|" + letterLine;
+  String out = morseLine + "|" + decodedMessage;
   webServer.send(200, "text/plain", out);
 }
 
@@ -204,7 +204,7 @@ void loop() {
     else if (currentToken == "---..") decoded = '8';
     else if (currentToken == "----.") decoded = '9';
 
-    addToScroll(letterLine, String(decoded), 20);
+    addToScroll(decodedMessage, String(decoded), 20);
     currentToken = "";
     morseLine = "";
   }
@@ -215,7 +215,7 @@ void loop() {
     u8g2.clearBuffer();
     u8g2.setCursor(0, 12);
     u8g2.print("Message: ");
-    u8g2.print(letterLine);
+    u8g2.print(decodedMessage);
     u8g2.sendBuffer();
   }
 
@@ -227,7 +227,7 @@ void loop() {
     u8g2.print(morseLine);
     u8g2.setCursor(0, 26);
     u8g2.print("Letters: ");
-    u8g2.print(letterLine);
+    u8g2.print(decodedMessage);
 
     // Signal bar simulation for press duration
     const int barWidth = 120;
