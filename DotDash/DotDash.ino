@@ -13,7 +13,7 @@
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, SCL_PIN, SDA_PIN);
 
 // WiFi AP Setup
-const char* AP_SSID = "DotDash-DSD";
+const char* AP_SSID = "DotDash";
 const char* AP_PASS = "";
 DNSServer dnsServer;
 WebServer webServer(80);

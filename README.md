@@ -4,6 +4,9 @@
 
 ---
 
+[![DOCS](https://img.shields.io/badge/Documentation-see%20docs-orange?style=flat-square&logo=appveyor)](https://upayanmazumder.github.io/DotDash/)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-kargo--frontend-blue?style=flat-square&logo=appveyor)](https://deepwiki.com/upayanmazumder/DotDash)
+
 ## Overview
 
 DotDash is a **real-time Morse code communication system** implemented entirely on an **ESP32**, combining **touch input**, **OLED display**, **live web portal**, and **digital logic gate simulation** for educational purposes.
@@ -134,7 +137,7 @@ This implementation demonstrates how **combinational logic circuits** can be use
 3. **Connect hardware** according to pin configuration
 4. **Upload the code** to your ESP32
 5. **Connect to WiFi AP:**
-   - SSID: `DotDash-DSD`
+   - SSID: `DotDash`
    - Password: (none - open network)
 6. **Access web interface** at `http://192.168.4.1`
 
@@ -173,14 +176,14 @@ Message complete: HELLO
   - Decoded letters display
 - **High contrast** for enhanced visibility
 
-Portal automatically opens when connecting to `DotDash-DSD` network via captive portal redirect.
+Portal automatically opens when connecting to `DotDash` network via captive portal redirect.
 
 ---
 
 ## Usage
 
 1. **Power on** the ESP32 with the DotDash firmware.
-2. **Connect** to the Wi-Fi network `DotDash-DSD` (open, no password).
+2. **Connect** to the Wi-Fi network `DotDash` (open, no password).
 3. **Open browser** and navigate to `http://192.168.4.1/` (or wait for captive portal).
 4. **Touch the pad** to input Morse code:
    - **Short press (<200ms)** = dot (`.`)
