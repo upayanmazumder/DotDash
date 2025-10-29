@@ -4,6 +4,9 @@
 
 ---
 
+[![DOCS](https://img.shields.io/badge/Documentation-see%20docs-orange?style=flat-square&logo=appveyor)](https://upayanmazumder.github.io/DotDash/)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-kargo--frontend-blue?style=flat-square&logo=appveyor)](https://deepwiki.com/upayanmazumder/DotDash)
+
 ## Overview
 
 DotDash is a **real-time Morse code communication system** implemented entirely on an **ESP32**, combining **touch input**, **OLED display**, **live web portal**, and **digital logic gate simulation** for educational purposes.
