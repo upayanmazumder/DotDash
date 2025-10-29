@@ -258,6 +258,20 @@ This project is open-source. Feel free to modify and distribute with attribution
 				</a>
 			</p>
 		</td>
+		<td>
+			Divyansh Saxena
+			<p align="center">
+				<img src="https://avatars.githubusercontent.com/u/176986720?v=4" width="150" height="150" alt="Divyansh Saxena">
+			</p>
+			<p align="center">
+				<a href="https://github.com/DIVYANSHSAXENA23">
+					<img src="http://www.iconninja.com/files/241/825/211/round-collaboration-social-github-code-circle-network-icon.svg" width="36" height="36" alt="GitHub"/>
+				</a>
+				<a href="linkedin.com/in/divyansh-saxena-2b48a7308">
+					<img src="http://www.iconninja.com/files/863/607/751/network-linkedin-social-connection-circular-circle-media-icon.svg" width="36" height="36" alt="LinkedIn"/>
+				</a>
+			</p>
+		</td>
 	</tr>
 </table>
 ---
