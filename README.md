@@ -137,7 +137,7 @@ This implementation demonstrates how **combinational logic circuits** can be use
 3. **Connect hardware** according to pin configuration
 4. **Upload the code** to your ESP32
 5. **Connect to WiFi AP:**
-   - SSID: `DotDash-DSD`
+   - SSID: `DotDash`
    - Password: (none - open network)
 6. **Access web interface** at `http://192.168.4.1`
 
