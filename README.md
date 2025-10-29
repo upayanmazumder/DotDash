@@ -227,7 +227,6 @@ This project is open-source. Feel free to modify and distribute with attribution
 ---
 
 ## Contributors  
-
 <table>
 	<tr align="center">
 		<td>
@@ -258,8 +257,23 @@ This project is open-source. Feel free to modify and distribute with attribution
 				</a>
 			</p>
 		</td>
+		<td>
+			Siddharth Verma
+			<p align="center">
+				<img src="https://github.com/SiddharthVerma1384.png" width="150" height="150" alt="Siddharth Verma">
+			</p>
+			<p align="center">
+				<a href="https://github.com/SiddharthVerma1384">
+					<img src="http://www.iconninja.com/files/241/825/211/round-collaboration-social-github-code-circle-network-icon.svg" width="36" height="36" alt="GitHub"/>
+				</a>
+				<a href="https://www.linkedin.com/in/siddharth-verma-9a8823368/">
+					<img src="http://www.iconninja.com/files/863/607/751/network-linkedin-social-connection-circular-circle-media-icon.svg" width="36" height="36" alt="LinkedIn"/>
+				</a>
+			</p>
+		</td>
 	</tr>
 </table>
+
 ---
 
 ## Acknowledgments
