@@ -1,43 +1,43 @@
-# DotDash  
+# DotDash
 
-**ESP32-Based Real-Time Morse Code Communication System with Digital Logic Simulation**  
+**ESP32-Based Real-Time Morse Code Communication System with Digital Logic Simulation**
 
 ---
 
-## Overview  
+## Overview
 
-DotDash is a **real-time Morse code communication system** implemented entirely on an **ESP32**, combining **touch input**, **OLED display**, **live web portal**, and **digital logic gate simulation** for educational purposes.  
+DotDash is a **real-time Morse code communication system** implemented entirely on an **ESP32**, combining **touch input**, **OLED display**, **live web portal**, and **digital logic gate simulation** for educational purposes.
 
-Users input Morse code through a **touch-sensitive pin**, and the system provides **instant feedback**:  
+Users input Morse code through a **touch-sensitive pin**, and the system provides **instant feedback**:
 
-- **Line 1 (OLED):** Scrolling dots and dashes representing raw Morse input  
-- **Line 2 (OLED):** Decoded letters as they are interpreted  
-- **Progress bar (OLED):** Visual indicator of touch duration, showing dot vs dash  
+- **Line 1 (OLED):** Scrolling dots and dashes representing raw Morse input
+- **Line 2 (OLED):** Decoded letters as they are interpreted
+- **Progress bar (OLED):** Visual indicator of touch duration, showing dot vs dash
 
-The **local web interface** mirrors the OLED display, updating live:  
+The **local web interface** mirrors the OLED display, updating live:
 
-- **Raw Morse** in one section  
-- **Decoded letters** in another  
+- **Raw Morse** in one section
+- **Decoded letters** in another
 
-DotDash automatically detects:  
+DotDash automatically detects:
 
-- **Letter gaps (1s):** Converts current Morse token to a letter  
-- **End of input (4s):** Finalizes the message display on OLED and in the web portal  
+- **Letter gaps (1s):** Converts current Morse token to a letter
+- **End of input (4s):** Finalizes the message display on OLED and in the web portal
 
 Additionally, live **Serial Monitor output** mirrors the OLED and web portal, enabling debugging or monitoring via USB.
 
 ---
 
-## Key Features  
+## Key Features
 
-1. **Touch-Based Morse Input:** Single pin differentiates dots (`.`) and dashes (`-`) based on press duration.  
-2. **OLED Feedback:** Live scrolling display of Morse symbols and decoded letters.  
-3. **Progress Visualization:** Horizontal bar indicates touch duration; fills progressively as touch is held.  
+1. **Touch-Based Morse Input:** Single pin differentiates dots (`.`) and dashes (`-`) based on press duration.
+2. **OLED Feedback:** Live scrolling display of Morse symbols and decoded letters.
+3. **Progress Visualization:** Horizontal bar indicates touch duration; fills progressively as touch is held.
 4. **Digital Logic Simulation:** Implements combinational logic (AND, OR, NOT gates) to encode letters A-Z to Morse code using 5-bit binary representation.
-5. **Web Interface:** Access via ESP32 Wi-Fi AP with terminal-styled interface; live updates of Morse and decoded letters.  
-6. **Automatic Decoding:** Detects letter gaps and message completion automatically.  
-7. **Configurable Timings:** Adjust `DOT_TIME`, `CHAR_GAP`, `END_GAP`, and other parameters to suit user preference.  
-8. **Serial Monitor Integration:** Real-time output of Morse and decoded letters for development and monitoring.  
+5. **Web Interface:** Access via ESP32 Wi-Fi AP with terminal-styled interface; live updates of Morse and decoded letters.
+6. **Automatic Decoding:** Detects letter gaps and message completion automatically.
+7. **Configurable Timings:** Adjust `DOT_TIME`, `CHAR_GAP`, `END_GAP`, and other parameters to suit user preference.
+8. **Serial Monitor Integration:** Real-time output of Morse and decoded letters for development and monitoring.
 
 ---
 
@@ -46,6 +46,7 @@ Additionally, live **Serial Monitor output** mirrors the OLED and web portal, en
 DotDash includes a **5-bit to Morse encoder** that simulates combinational logic circuits:
 
 ### Circuit Design
+
 - **5 Input Bits** (b4, b3, b2, b1, b0) represent letters A-Z (values 0-25)
 - **5 NOT Gates** invert each input bit
 - **26 AND Gates** detect unique 5-bit patterns for each letter
@@ -55,17 +56,18 @@ DotDash includes a **5-bit to Morse encoder** that simulates combinational logic
 
 Each letter is encoded using Boolean algebra in **Sum-of-Products (SOP)** form:
 
-| Letter | Binary | Boolean Expression | Morse |
-|--------|--------|-------------------|-------|
-| A | 00000 | ¬b4 · ¬b3 · ¬b2 · ¬b1 · ¬b0 | `.-` |
-| B | 00001 | ¬b4 · ¬b3 · ¬b2 · ¬b1 · b0 | `-...` |
-| C | 00010 | ¬b4 · ¬b3 · ¬b2 · b1 · ¬b0 | `-.-.` |
-| ... | ... | ... | ... |
-| Z | 11001 | b4 · b3 · ¬b2 · ¬b1 · b0 | `--..` |
+| Letter | Binary | Boolean Expression          | Morse  |
+| ------ | ------ | --------------------------- | ------ |
+| A      | 00000  | ¬b4 · ¬b3 · ¬b2 · ¬b1 · ¬b0 | `.-`   |
+| B      | 00001  | ¬b4 · ¬b3 · ¬b2 · ¬b1 · b0  | `-...` |
+| C      | 00010  | ¬b4 · ¬b3 · ¬b2 · b1 · ¬b0  | `-.-.` |
+| ...    | ...    | ...                         | ...    |
+| Z      | 11001  | b4 · b3 · ¬b2 · ¬b1 · b0    | `--..` |
 
 **Note:** `·` represents AND, `¬` represents NOT, `+` represents OR
 
 ### Gate Count
+
 - **NOT Gates:** 5 (one per input bit)
 - **5-input AND Gates:** 26 (one per letter)
 - **Total:** 32 gates for complete A-Z decoder
@@ -74,24 +76,24 @@ This implementation demonstrates how **combinational logic circuits** can be use
 
 ---
 
-## Implementation Notes  
+## Implementation Notes
 
-- **ESP32 Responsibilities:** Wi-Fi Access Point, DNS redirect, web server, OLED control, touch input reading, scrolling logic, progress bar animation, digital logic gate simulation, and live Serial output.  
-- **Touch Input:** Uses `touchRead()` with dynamic threshold calibration to detect touch events and differentiate dots vs dashes.  
-- **OLED Display (128x64 SSD1306):** Scrolling Morse line, decoded letter line, and touch progress bar with real-time fill animation.  
-- **Web Portal:** Terminal-styled interface with two separate divs for live Morse symbols and decoded letters; updates every 200ms.  
+- **ESP32 Responsibilities:** Wi-Fi Access Point, DNS redirect, web server, OLED control, touch input reading, scrolling logic, progress bar animation, digital logic gate simulation, and live Serial output.
+- **Touch Input:** Uses `touchRead()` with dynamic threshold calibration to detect touch events and differentiate dots vs dashes.
+- **OLED Display (128x64 SSD1306):** Scrolling Morse line, decoded letter line, and touch progress bar with real-time fill animation.
+- **Web Portal:** Terminal-styled interface with two separate divs for live Morse symbols and decoded letters; updates every 200ms.
 - **Logic Gate Simulation:** AND, OR, NOT, and XOR functions simulate hardware-level combinational logic for character encoding.
-- **Timing Parameters:**  
+- **Timing Parameters:**
 
-| Parameter     | Default | Description                  |
-|---------------|---------|------------------------------|
-| `DOT_TIME`    | 200 ms  | Max duration for a dot       |
-| `DASH_TIME`   | 600 ms  | Max duration for a dash      |
-| `CHAR_GAP`    | 1000 ms | Gap to detect end of letter  |
-| `END_GAP`     | 4000 ms | Gap to detect end of message |
-| `DEBOUNCE`    | 30 ms   | Touch debounce delay         |
+| Parameter   | Default | Description                  |
+| ----------- | ------- | ---------------------------- |
+| `DOT_TIME`  | 200 ms  | Max duration for a dot       |
+| `DASH_TIME` | 600 ms  | Max duration for a dash      |
+| `CHAR_GAP`  | 1000 ms | Gap to detect end of letter  |
+| `END_GAP`   | 4000 ms | Gap to detect end of message |
+| `DEBOUNCE`  | 30 ms   | Touch debounce delay         |
 
-- **Morse Table:** Supports A–Z; easily extendable to 0–9 and punctuation.  
+- **Morse Table:** Supports A–Z; easily extendable to 0–9 and punctuation.
 
 ---
 
@@ -104,11 +106,11 @@ This implementation demonstrates how **combinational logic circuits** can be use
 
 ### Pin Configuration
 
-| Component | Pin |
-|-----------|-----|
-| Touch Input | GPIO 4 |
-| OLED SDA | GPIO 21 |
-| OLED SCL | GPIO 22 |
+| Component   | Pin     |
+| ----------- | ------- |
+| Touch Input | GPIO 4  |
+| OLED SDA    | GPIO 21 |
+| OLED SCL    | GPIO 22 |
 
 ---
 
@@ -138,7 +140,8 @@ This implementation demonstrates how **combinational logic circuits** can be use
 
 ---
 
-## Serial Monitor Example  
+## Serial Monitor Example
+
 ```
 DSD Morse Encoder Started (A-Z Complete)
 Access at: 192.168.4.1
@@ -160,7 +163,7 @@ Message complete: HELLO
 
 ---
 
-## Web Portal Features  
+## Web Portal Features
 
 - **Terminal aesthetic** with green on black background
 - **Real-time updates** every 200ms
@@ -174,19 +177,20 @@ Portal automatically opens when connecting to `DotDash-DSD` network via captive 
 
 ---
 
-## Usage  
+## Usage
 
-1. **Power on** the ESP32 with the DotDash firmware.  
-2. **Connect** to the Wi-Fi network `DotDash-DSD` (open, no password).  
-3. **Open browser** and navigate to `http://192.168.4.1/` (or wait for captive portal).  
-4. **Touch the pad** to input Morse code:  
-   - **Short press (<200ms)** = dot (`.`)  
-   - **Long press (>200ms)** = dash (`-`)  
-5. **Watch feedback** on OLED display and web portal simultaneously.  
+1. **Power on** the ESP32 with the DotDash firmware.
+2. **Connect** to the Wi-Fi network `DotDash-DSD` (open, no password).
+3. **Open browser** and navigate to `http://192.168.4.1/` (or wait for captive portal).
+4. **Touch the pad** to input Morse code:
+   - **Short press (<200ms)** = dot (`.`)
+   - **Long press (>200ms)** = dash (`-`)
+5. **Watch feedback** on OLED display and web portal simultaneously.
 6. **Wait 1 second** between letters for automatic decoding.
-7. **Wait 4 seconds** after last input for message finalization.  
+7. **Wait 4 seconds** after last input for message finalization.
 
 ### Tips for Best Results
+
 - Calibrate touch sensitivity by adjusting `THRESHOLD_FACTOR` (default 0.7)
 - Use consistent pressure for reliable dot/dash detection
 - Practice timing: quick taps for dots, held presses for dashes
@@ -226,7 +230,8 @@ This project is open-source. Feel free to modify and distribute with attribution
 
 ---
 
-## Contributors  
+## Contributors
+
 <table>
 	<tr align="center">
 		<td>
@@ -271,7 +276,7 @@ This project is open-source. Feel free to modify and distribute with attribution
 				</a>
 			</p>
 		</td>
-    <td>
+    	<td>
 			Divyansh Saxena
 			<p align="center">
 				<img src="https://avatars.githubusercontent.com/u/176986720?v=4" width="150" height="150" alt="Divyansh Saxena">
@@ -285,7 +290,7 @@ This project is open-source. Feel free to modify and distribute with attribution
 				</a>
 			</p>
 		</td>
-    <td>
+    	<td>
 			Aditya Rawat
 			<p align="center">
 				<img src="https://github.com/adityarawat-05.png" width="150" height="150" alt="Aditya Rawat">
@@ -301,7 +306,6 @@ This project is open-source. Feel free to modify and distribute with attribution
 		</td>
 	</tr>
 </table>
-
 
 ---
 
