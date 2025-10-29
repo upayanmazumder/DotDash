@@ -5,7 +5,7 @@
 ---
 
 [![DOCS](https://img.shields.io/badge/Documentation-see%20docs-orange?style=flat-square&logo=appveyor)](https://upayanmazumder.github.io/DotDash/)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-kargo--frontend-blue?style=flat-square&logo=appveyor)](https://deepwiki.com/upayanmazumder/DotDash)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-DotDash-blue?style=flat-square&logo=appveyor)](https://deepwiki.com/upayanmazumder/DotDash)
 
 ## Overview
 
