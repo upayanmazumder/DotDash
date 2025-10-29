@@ -176,14 +176,14 @@ Message complete: HELLO
   - Decoded letters display
 - **High contrast** for enhanced visibility
 
-Portal automatically opens when connecting to `DotDash-DSD` network via captive portal redirect.
+Portal automatically opens when connecting to `DotDash` network via captive portal redirect.
 
 ---
 
 ## Usage
 
 1. **Power on** the ESP32 with the DotDash firmware.
-2. **Connect** to the Wi-Fi network `DotDash-DSD` (open, no password).
+2. **Connect** to the Wi-Fi network `DotDash` (open, no password).
 3. **Open browser** and navigate to `http://192.168.4.1/` (or wait for captive portal).
 4. **Touch the pad** to input Morse code:
    - **Short press (<200ms)** = dot (`.`)
