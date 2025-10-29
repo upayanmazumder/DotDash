@@ -143,6 +143,7 @@ void handleRoot() {
                 "document.getElementById('letters').innerText=parts[1]||'...';"
                 "},200);"
                 "</script></body></html>";
+  webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   webServer.send(200, "text/html", html);
 }
 
@@ -164,9 +165,19 @@ void setup() {
 
   WiFi.softAP(AP_SSID, AP_PASS);
   IPAddress apIP = WiFi.softAPIP();
+
   dnsServer.start(53, "*", apIP);
+
   webServer.on("/", handleRoot);
   webServer.on("/live", handleLive);
+
+  webServer.onNotFound(handleRoot);
+
+  webServer.on("/generate_204", handleRoot);          
+  webServer.on("/hotspot-detect.html", handleRoot);
+  webServer.on("/ncsi.txt", handleRoot);
+  webServer.on("/connecttest.txt", handleRoot);
+
   webServer.begin();
 
   long total = 0;
@@ -190,13 +201,13 @@ void loop() {
   int reading = touchRead(TOUCH_PIN);
   unsigned long now = millis();
 
-  if (reading < touchThreshold && !Flip_Flop_Q && now - lastRelease > DEBOUNCE) {
-    Flip_Flop_Q = true;
+  if (reading < touchThreshold && !Flip_Flop && now - lastRelease > DEBOUNCE) {
+    Flip_Flop = true;
     pressStart = now;
   }
 
-  if (Flip_Flop_Q && reading >= touchThreshold) {
-    Flip_Flop_Q = false;
+  if (Flip_Flop && reading >= touchThreshold) {
+    Flip_Flop = false;
     unsigned long pressDuration = now - pressStart;
     lastRelease = now;
     String symbol = (pressDuration < DOT_TIME) ? "." : "-";
@@ -205,7 +216,7 @@ void loop() {
   }
 
   // Decode Morse to letter (A–Z)
-  if (!Flip_Flop_Q && currentToken != "" && now - lastRelease > CHAR_GAP) {
+  if (!Flip_Flop && currentToken != "" && now - lastRelease > CHAR_GAP) {
     char decoded = '?';
     if (currentToken == ".-") decoded = 'A';
     else if (currentToken == "-...") decoded = 'B';
@@ -239,7 +250,7 @@ void loop() {
     morseLine = "";
   }
 
-  if (!Flip_Flop_Q && now - lastRelease > END_GAP && !translationShown) {
+  if (!Flip_Flop && now - lastRelease > END_GAP && !translationShown) {
     translationShown = true;
     u8g2.clearBuffer();
     u8g2.setCursor(0, 12);
@@ -263,7 +274,7 @@ void loop() {
     const int barY = 58;
     u8g2.drawFrame(barX, barY, barWidth, barHeight);
 
-    if (Flip_Flop_Q) {
+    if (Flip_Flop) {
       float progress = (float)(now - pressStart) / (float)DASH_TIME;
       if (progress > 1.0) progress = 1.0;
       int fill = progress * barWidth;
